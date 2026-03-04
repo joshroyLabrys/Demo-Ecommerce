@@ -155,6 +155,11 @@ export default function Home() {
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                  {cat.trending && (
+                    <Badge className="absolute top-3 left-3 rounded-full bg-amber-500 text-white text-[10px] px-2 py-0.5 border-0">
+                      Trending
+                    </Badge>
+                  )}
                   <div className="absolute bottom-4 left-4 right-4">
                     <h3 className="text-sm font-semibold text-white">{cat.name}</h3>
                     <p className="mt-0.5 text-xs text-white/70">{cat.productCount} products</p>

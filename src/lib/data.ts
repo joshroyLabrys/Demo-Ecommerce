@@ -26,6 +26,7 @@ export interface Category {
   description: string;
   productCount: number;
   image: string;
+  trending?: boolean;
 }
 
 export interface Review {
@@ -48,6 +49,7 @@ export const categories: Category[] = [
     description: "Premium audio, wearables, and smart devices for the modern lifestyle.",
     productCount: 4,
     image: "https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=800&auto=format&fit=crop&q=80",
+    trending: true,
   },
   {
     id: "cat-2",
@@ -64,6 +66,7 @@ export const categories: Category[] = [
     description: "Timeless essentials and statement pieces for every occasion.",
     productCount: 4,
     image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800&auto=format&fit=crop&q=80",
+    trending: true,
   },
   {
     id: "cat-4",
@@ -88,6 +91,7 @@ export const categories: Category[] = [
     description: "Elevated cookware, barware, and tabletop essentials.",
     productCount: 4,
     image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&auto=format&fit=crop&q=80",
+    trending: true,
   },
 ];
 
