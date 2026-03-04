@@ -10,6 +10,12 @@ export interface CartItem {
   selectedColor?: string;
 }
 
+const PROMO_CODES: Record<string, { type: "percent" | "fixed" | "freeship"; value: number; label: string }> = {
+  SAVE10: { type: "percent", value: 10, label: "10% off" },
+  WELCOME20: { type: "percent", value: 20, label: "20% off" },
+  FREESHIP: { type: "freeship", value: 0, label: "Free shipping" },
+};
+
 interface CartContextType {
   items: CartItem[];
   addItem: (product: Product, quantity?: number, size?: string, color?: string) => void;
@@ -21,6 +27,14 @@ interface CartContextType {
   shipping: number;
   tax: number;
   total: number;
+  promoCode: string | null;
+  promoDiscount: number;
+  promoLabel: string | null;
+  applyPromoCode: (code: string) => boolean;
+  removePromoCode: () => void;
+  shippingMethod: "standard" | "express" | "overnight";
+  setShippingMethod: (method: "standard" | "express" | "overnight") => void;
+  shippingCost: number;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -30,6 +44,8 @@ const CART_STORAGE_KEY = "meridian-cart";
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [promoCode, setPromoCode] = useState<string | null>(null);
+  const [shippingMethod, setShippingMethod] = useState<"standard" | "express" | "overnight">("standard");
 
   useEffect(() => {
     const stored = localStorage.getItem(CART_STORAGE_KEY);
@@ -79,13 +95,44 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => {
     setItems([]);
+    setPromoCode(null);
+    setShippingMethod("standard");
+  }, []);
+
+  const applyPromoCode = useCallback((code: string): boolean => {
+    const upper = code.toUpperCase().trim();
+    if (PROMO_CODES[upper]) {
+      setPromoCode(upper);
+      return true;
+    }
+    return false;
+  }, []);
+
+  const removePromoCode = useCallback(() => {
+    setPromoCode(null);
   }, []);
 
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const shipping = subtotal >= 200 ? 0 : 15.99;
-  const tax = subtotal * 0.08;
-  const total = subtotal + shipping + tax;
+
+  const shippingRates = { standard: 0, express: 15.99, overnight: 29.99 };
+  const baseShipping = subtotal >= 200 ? 0 : shippingRates[shippingMethod] || 15.99;
+  const promo = promoCode ? PROMO_CODES[promoCode] : null;
+  const isFreeShipPromo = promo?.type === "freeship";
+  const shippingCost = isFreeShipPromo ? 0 : (shippingMethod === "standard" ? baseShipping : shippingRates[shippingMethod]);
+  const shipping = shippingCost;
+
+  const promoDiscount = promo
+    ? promo.type === "percent"
+      ? subtotal * (promo.value / 100)
+      : promo.type === "fixed"
+        ? promo.value
+        : 0
+    : 0;
+  const promoLabel = promo?.label ?? null;
+
+  const tax = (subtotal - promoDiscount) * 0.08;
+  const total = subtotal - promoDiscount + shipping + tax;
 
   return (
     <CartContext.Provider
@@ -100,6 +147,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
         shipping,
         tax,
         total,
+        promoCode,
+        promoDiscount,
+        promoLabel,
+        applyPromoCode,
+        removePromoCode,
+        shippingMethod,
+        setShippingMethod,
+        shippingCost,
       }}
     >
       {children}

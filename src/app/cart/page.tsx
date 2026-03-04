@@ -1,16 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
-import { Trash2, Minus, Plus, ShoppingBag, ArrowRight, Package, Shield, CreditCard } from "lucide-react";
+import { Trash2, Minus, Plus, ShoppingBag, ArrowRight, Package, Shield, CreditCard, Tag, X, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCart } from "@/contexts/cart-context";
+import { toast } from "sonner";
 
 export default function CartPage() {
-  const { items, removeItem, updateQuantity, itemCount, subtotal, shipping, tax, total } = useCart();
+  const { items, removeItem, updateQuantity, itemCount, subtotal, shipping, tax, total, promoCode, promoDiscount, promoLabel, applyPromoCode, removePromoCode } = useCart();
+  const [promoInput, setPromoInput] = useState("");
 
   if (items.length === 0) {
     return (
@@ -69,9 +75,20 @@ export default function CartPage() {
                       <div className="flex flex-1 flex-col justify-between">
                         <div className="flex justify-between">
                           <div>
-                            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              {item.product.brand}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                {item.product.brand}
+                              </p>
+                              {item.product.isNew && (
+                                <Badge className="rounded-full bg-foreground text-background text-[10px] px-1.5 py-0 h-4">NEW</Badge>
+                              )}
+                              {item.product.isFeatured && !item.product.isNew && (
+                                <Badge variant="secondary" className="rounded-full text-[10px] px-1.5 py-0 h-4">Best Seller</Badge>
+                              )}
+                              {item.product.originalPrice > item.product.price && (
+                                <Badge className="rounded-full bg-red-500 text-white text-[10px] px-1.5 py-0 h-4 border-0">Sale</Badge>
+                              )}
+                            </div>
                             <Link
                               href={`/products/${item.product.id}`}
                               className="mt-0.5 text-sm font-medium hover:underline sm:text-base"
@@ -150,15 +167,99 @@ export default function CartPage() {
 
         {/* Order Summary */}
         <div className="space-y-4">
+          {/* Free Shipping Progress */}
+          {subtotal < 200 && (
+            <Card className="rounded-2xl border-white/20 bg-white/60 backdrop-blur-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="font-medium flex items-center gap-1.5">
+                    <Truck className="h-4 w-4" />
+                    Free Shipping
+                  </span>
+                  <span className="text-muted-foreground">${(200 - subtotal).toFixed(2)} away</span>
+                </div>
+                <Progress value={(subtotal / 200) * 100} className="h-2" />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Add ${(200 - subtotal).toFixed(2)} more for free shipping!
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="rounded-2xl border-white/20 bg-white/60 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Order Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Promo Code */}
+              <div>
+                {promoCode ? (
+                  <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3">
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-green-600" />
+                      <div>
+                        <p className="text-sm font-medium text-green-800">{promoCode}</p>
+                        <p className="text-xs text-green-600">{promoLabel}</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-green-600 hover:text-red-500"
+                      onClick={removePromoCode}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Promo code"
+                      value={promoInput}
+                      onChange={(e) => setPromoInput(e.target.value)}
+                      className="rounded-lg text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (applyPromoCode(promoInput)) {
+                            toast.success("Promo code applied!");
+                            setPromoInput("");
+                          } else {
+                            toast.error("Invalid promo code");
+                          }
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      className="shrink-0 rounded-lg"
+                      onClick={() => {
+                        if (applyPromoCode(promoInput)) {
+                          toast.success("Promo code applied!");
+                          setPromoInput("");
+                        } else {
+                          toast.error("Invalid promo code");
+                        }
+                      }}
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
                 <span className="font-medium">${subtotal.toFixed(2)}</span>
               </div>
+              {promoDiscount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-green-600">Discount ({promoLabel})</span>
+                  <span className="font-medium text-green-600">-${promoDiscount.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Shipping</span>
                 <span className="font-medium">
@@ -169,11 +270,6 @@ export default function CartPage() {
                 <span className="text-muted-foreground">Tax</span>
                 <span className="font-medium">${tax.toFixed(2)}</span>
               </div>
-              {subtotal < 200 && (
-                <p className="text-xs text-muted-foreground">
-                  Add ${(200 - subtotal).toFixed(2)} more for free shipping
-                </p>
-              )}
               <Separator />
               <div className="flex justify-between">
                 <span className="font-semibold">Total</span>

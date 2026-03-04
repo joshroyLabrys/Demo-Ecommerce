@@ -14,6 +14,8 @@ import {
   Check,
   Eye,
   EyeOff,
+  Package,
+  ClipboardCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,9 +36,22 @@ import { useOrders } from "@/contexts/order-context";
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 
+const STEPS = [
+  { num: 1, label: "Contact", icon: Package },
+  { num: 2, label: "Shipping", icon: Truck },
+  { num: 3, label: "Payment", icon: CreditCard },
+  { num: 4, label: "Review", icon: ClipboardCheck },
+];
+
+const SHIPPING_METHODS = [
+  { id: "standard" as const, label: "Standard Shipping", price: "Free", desc: "5-7 business days", cost: 0 },
+  { id: "express" as const, label: "Express Shipping", price: "$15.99", desc: "2-3 business days", cost: 15.99 },
+  { id: "overnight" as const, label: "Overnight Shipping", price: "$29.99", desc: "Next business day", cost: 29.99 },
+];
+
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, subtotal, shipping, tax, total, clearCart } = useCart();
+  const { items, subtotal, shipping, tax, total, clearCart, promoCode, promoDiscount, promoLabel, shippingMethod, setShippingMethod } = useCart();
   const { placeOrder } = useOrders();
   const { user } = useAuth();
 
@@ -76,7 +91,7 @@ export default function CheckoutPage() {
   };
 
   const directionRef = useRef(1);
-  const nextStep = () => { directionRef.current = 1; setStep((prev) => Math.min(prev + 1, 3)); };
+  const nextStep = () => { directionRef.current = 1; setStep((prev) => Math.min(prev + 1, 4)); };
   const prevStep = () => { directionRef.current = -1; setStep((prev) => Math.max(prev - 1, 1)); };
 
   const handlePlaceOrder = () => {
@@ -111,6 +126,8 @@ export default function CheckoutPage() {
     );
   }
 
+  const countryLabel = { US: "United States", CA: "Canada", GB: "United Kingdom", AU: "Australia" }[formData.country] || formData.country;
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
       {/* Header */}
@@ -122,11 +139,7 @@ export default function CheckoutPage() {
       {/* Progress */}
       <div className="mb-10">
         <div className="flex items-center justify-center gap-0">
-          {[
-            { num: 1, label: "Contact" },
-            { num: 2, label: "Shipping" },
-            { num: 3, label: "Payment" },
-          ].map((s, i) => (
+          {STEPS.map((s, i) => (
             <div key={s.num} className="flex items-center">
               <div className="flex flex-col items-center gap-1.5">
                 <motion.div
@@ -142,8 +155,8 @@ export default function CheckoutPage() {
                 </motion.div>
                 <span className="text-xs font-medium text-muted-foreground">{s.label}</span>
               </div>
-              {i < 2 && (
-                <div className="relative mb-5 h-0.5 w-16 overflow-hidden rounded bg-neutral-200 sm:w-24">
+              {i < STEPS.length - 1 && (
+                <div className="relative mb-5 h-0.5 w-12 overflow-hidden rounded bg-neutral-200 sm:w-20">
                   <motion.div
                     className="absolute inset-y-0 left-0 rounded bg-foreground"
                     initial={{ width: '0%' }}
@@ -164,8 +177,9 @@ export default function CheckoutPage() {
             <CardHeader>
               <CardTitle>
                 {step === 1 && "Contact Information"}
-                {step === 2 && "Shipping Address"}
+                {step === 2 && "Shipping Details"}
                 {step === 3 && "Payment Details"}
+                {step === 4 && "Review Your Order"}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -298,6 +312,38 @@ export default function CheckoutPage() {
                         </Select>
                       </div>
                     </div>
+
+                    <Separator />
+
+                    {/* Shipping Method */}
+                    <div>
+                      <Label>Shipping method</Label>
+                      <RadioGroup
+                        value={shippingMethod}
+                        onValueChange={(v) => setShippingMethod(v as "standard" | "express" | "overnight")}
+                        className="mt-3 space-y-3"
+                      >
+                        {SHIPPING_METHODS.map((method) => (
+                          <div
+                            key={method.id}
+                            className={`flex items-center justify-between rounded-lg border p-4 transition-colors ${
+                              shippingMethod === method.id ? "border-foreground bg-foreground/5" : ""
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <RadioGroupItem value={method.id} id={method.id} />
+                              <Label htmlFor={method.id} className="cursor-pointer font-normal">
+                                <span className="font-medium">{method.label}</span>
+                                <span className="block text-xs text-muted-foreground">{method.desc}</span>
+                              </Label>
+                            </div>
+                            <span className="text-sm font-semibold">
+                              {subtotal >= 200 && method.id === "standard" ? "Free" : method.price}
+                            </span>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
                   </motion.div>
                 )}
 
@@ -381,6 +427,96 @@ export default function CheckoutPage() {
                     </div>
                   </motion.div>
                 )}
+
+                {/* Step 4 - Review */}
+                {step === 4 && (
+                  <motion.div
+                    key="step-4"
+                    initial={{ opacity: 0, x: directionRef.current * 30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: directionRef.current * -30 }}
+                    transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                    className="space-y-6"
+                  >
+                    {/* Contact Summary */}
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold">Contact</h4>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { directionRef.current = -1; setStep(1); }}>
+                          Edit
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{formData.email}</p>
+                      <p className="text-sm text-muted-foreground">{formData.firstName} {formData.lastName}</p>
+                      {formData.phone && <p className="text-sm text-muted-foreground">{formData.phone}</p>}
+                    </div>
+
+                    {/* Shipping Summary */}
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold">Shipping Address</h4>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { directionRef.current = -1; setStep(2); }}>
+                          Edit
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{formData.address}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formData.city}, {formData.state} {formData.zipCode}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{countryLabel}</p>
+                      <Separator className="my-3" />
+                      <p className="text-sm">
+                        <span className="font-medium">
+                          {SHIPPING_METHODS.find((m) => m.id === shippingMethod)?.label}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {" "}&middot; {SHIPPING_METHODS.find((m) => m.id === shippingMethod)?.desc}
+                        </span>
+                      </p>
+                    </div>
+
+                    {/* Payment Summary */}
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold">Payment</h4>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { directionRef.current = -1; setStep(3); }}>
+                          Edit
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">
+                          Card ending in {formData.cardNumber.replace(/\s/g, "").slice(-4) || "****"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Items Summary */}
+                    <div className="rounded-lg border p-4">
+                      <h4 className="text-sm font-semibold mb-3">Items ({items.length})</h4>
+                      <div className="space-y-3">
+                        {items.map((item) => (
+                          <div key={item.product.id} className="flex items-center gap-3">
+                            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
+                              <Image
+                                src={item.product.image}
+                                alt={item.product.name}
+                                fill
+                                className="object-cover"
+                                sizes="48px"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="truncate text-sm">{item.product.name}</p>
+                              <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                            </div>
+                            <p className="text-sm font-medium">${(item.product.price * item.quantity).toFixed(2)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
               </AnimatePresence>
 
               {/* Navigation */}
@@ -392,7 +528,7 @@ export default function CheckoutPage() {
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
                 </Button>
-                {step < 3 ? (
+                {step < 4 ? (
                   <Button className="rounded-full px-8" onClick={nextStep}>
                     Continue
                   </Button>
@@ -444,6 +580,12 @@ export default function CheckoutPage() {
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>${subtotal.toFixed(2)}</span>
                 </div>
+                {promoDiscount > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-green-600">Discount ({promoLabel})</span>
+                    <span className="text-green-600">-${promoDiscount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Shipping</span>
                   <span>{shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}</span>
