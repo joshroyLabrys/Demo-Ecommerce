@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "motion/react";
-import { Search, SlidersHorizontal, ChevronDown, X } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -13,16 +13,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { ProductCard } from "@/components/product-card";
+import {
+  FilterPanel,
+  emptyFilters,
+  applyFilters,
+  getActiveFilterCount,
+  type Filters,
+} from "@/components/filter-panel";
 import { categories, products } from "@/lib/data";
-
-const priceRanges = [
-  { id: "all", label: "All Prices", min: 0, max: Infinity },
-  { id: "under-50", label: "Under $50", min: 0, max: 50 },
-  { id: "50-100", label: "$50 – $100", min: 50, max: 100 },
-  { id: "100-250", label: "$100 – $250", min: 100, max: 250 },
-  { id: "over-250", label: "Over $250", min: 250, max: Infinity },
-];
 
 const sortOptions = [
   { id: "featured", label: "Featured" },
@@ -35,10 +35,11 @@ const sortOptions = [
 export default function CategoriesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedPrice, setSelectedPrice] = useState("all");
   const [selectedSort, setSelectedSort] = useState("featured");
+  const [filters, setFilters] = useState<Filters>(emptyFilters);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-  const filteredProducts = useMemo(() => {
+  const baseProducts = useMemo(() => {
     let result = [...products];
 
     if (searchQuery) {
@@ -55,10 +56,11 @@ export default function CategoriesPage() {
       result = result.filter((p) => p.categorySlug === selectedCategory);
     }
 
-    const priceRange = priceRanges.find((r) => r.id === selectedPrice);
-    if (priceRange && selectedPrice !== "all") {
-      result = result.filter((p) => p.price >= priceRange.min && p.price < priceRange.max);
-    }
+    return result;
+  }, [searchQuery, selectedCategory]);
+
+  const filteredProducts = useMemo(() => {
+    let result = applyFilters(baseProducts, filters);
 
     switch (selectedSort) {
       case "newest":
@@ -76,23 +78,14 @@ export default function CategoriesPage() {
     }
 
     return result;
-  }, [searchQuery, selectedCategory, selectedPrice, selectedSort]);
+  }, [baseProducts, filters, selectedSort]);
 
-  const activeFilters = [];
-  if (selectedCategory !== "all") {
-    const cat = categories.find((c) => c.slug === selectedCategory);
-    if (cat) activeFilters.push({ type: "category", label: cat.name });
-  }
-  if (selectedPrice !== "all") {
-    const pr = priceRanges.find((r) => r.id === selectedPrice);
-    if (pr) activeFilters.push({ type: "price", label: pr.label });
-  }
-  if (searchQuery) activeFilters.push({ type: "search", label: `"${searchQuery}"` });
+  const activeFilterCount = getActiveFilterCount(filters);
 
-  const clearFilter = (type: string) => {
-    if (type === "category") setSelectedCategory("all");
-    if (type === "price") setSelectedPrice("all");
-    if (type === "search") setSearchQuery("");
+  const clearAll = () => {
+    setSelectedCategory("all");
+    setSearchQuery("");
+    setFilters(emptyFilters);
   };
 
   return (
@@ -103,192 +96,186 @@ export default function CategoriesPage() {
           <p className="mb-1 text-xs font-bold uppercase tracking-widest text-amber-700">Browse</p>
           <h1 className="text-3xl font-bold tracking-tight">All Products</h1>
           <p className="mt-2 text-muted-foreground">
-            Browse our full collection of {filteredProducts.length} products
+            Browse our full collection of {products.length} products
           </p>
         </div>
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Category Grid */}
-      <div className="mb-10 grid grid-cols-3 gap-3 sm:grid-cols-6">
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setSelectedCategory(selectedCategory === cat.slug ? "all" : cat.slug)}
-            className={`group relative aspect-[4/3] overflow-hidden rounded-xl transition-all shadow-sm ${
-              selectedCategory === cat.slug
-                ? "ring-2 ring-foreground ring-offset-2 shadow-md"
-                : "hover:ring-2 hover:ring-foreground/20 hover:shadow-md"
-            }`}
-          >
-            <Image
-              src={cat.image}
-              alt={cat.name}
-              fill
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
-              sizes="(max-width: 640px) 33vw, 16vw"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-            <span className="absolute bottom-2.5 left-2.5 text-xs font-semibold text-white">{cat.name}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Filter Bar */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search products..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="rounded-full pl-10"
-          />
-        </div>
-        <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 rounded-full">
-                {priceRanges.find((r) => r.id === selectedPrice)?.label}
-                <ChevronDown className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="rounded-xl">
-              {priceRanges.map((range) => (
-                <DropdownMenuItem
-                  key={range.id}
-                  onClick={() => setSelectedPrice(range.id)}
-                  className={selectedPrice === range.id ? "bg-accent" : ""}
-                >
-                  {range.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 rounded-full">
-                Sort: {sortOptions.find((s) => s.id === selectedSort)?.label}
-                <ChevronDown className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="rounded-xl">
-              {sortOptions.map((option) => (
-                <DropdownMenuItem
-                  key={option.id}
-                  onClick={() => setSelectedSort(option.id)}
-                  className={selectedSort === option.id ? "bg-accent" : ""}
-                >
-                  {option.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {/* Active Filters */}
-      <AnimatePresence>
-        {activeFilters.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-            className="mb-6 overflow-hidden"
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted-foreground">Active filters:</span>
-              <AnimatePresence mode="popLayout">
-                {activeFilters.map((filter) => (
-                  <motion.div
-                    key={filter.type}
-                    layout
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                  >
-                    <Badge variant="secondary" className="gap-1 rounded-full">
-                      {filter.label}
-                      <button onClick={() => clearFilter(filter.type)}>
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-auto rounded-full px-2 py-1 text-xs"
-                onClick={() => {
-                  setSelectedCategory("all");
-                  setSelectedPrice("all");
-                  setSearchQuery("");
-                }}
-              >
-                Clear all
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Product Grid */}
-      <AnimatePresence mode="wait">
-        {filteredProducts.length > 0 ? (
-          <motion.div
-            key={`${selectedCategory}-${selectedPrice}-${selectedSort}-${searchQuery}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-            className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4"
-          >
-            {filteredProducts.map((product, index) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.35,
-                  delay: Math.min(index * 0.03, 0.3),
-                  ease: [0.25, 0.1, 0.25, 1],
-                }}
-              >
-                <ProductCard product={product} />
-              </motion.div>
-            ))}
-          </motion.div>
-        ) : (
-          <motion.div
-            key="empty"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.3 }}
-            className="flex flex-col items-center justify-center py-20"
-          >
-            <SlidersHorizontal className="mb-4 h-12 w-12 text-muted-foreground/40" />
-            <h3 className="text-lg font-medium">No products found</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Try adjusting your filters or search query
-            </p>
-            <Button
-              variant="outline"
-              className="mt-4 rounded-full"
-              onClick={() => {
-                setSelectedCategory("all");
-                setSelectedPrice("all");
-                setSearchQuery("");
-              }}
+        {/* Category Grid */}
+        <div className="mb-8 grid grid-cols-3 gap-3 sm:grid-cols-6">
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(selectedCategory === cat.slug ? "all" : cat.slug)}
+              className={`group relative aspect-[4/3] overflow-hidden rounded-xl shadow-sm transition-all ${
+                selectedCategory === cat.slug
+                  ? "ring-2 ring-foreground ring-offset-2 shadow-md"
+                  : "hover:ring-2 hover:ring-foreground/20 hover:shadow-md"
+              }`}
             >
-              Clear Filters
+              <Image
+                src={cat.image}
+                alt={cat.name}
+                fill
+                className="object-cover transition-transform duration-300 group-hover:scale-105"
+                sizes="(max-width: 640px) 33vw, 16vw"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              <span className="absolute bottom-2.5 left-2.5 text-xs font-semibold text-white">
+                {cat.name}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Toolbar: Search + Sort + Mobile Filter Toggle */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative max-w-sm flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search products..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="rounded-full pl-10"
+            />
+          </div>
+          <div className="flex gap-2">
+            {/* Mobile filter toggle */}
+            <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 rounded-full lg:hidden"
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <Badge className="ml-0.5 h-5 w-5 rounded-full bg-foreground p-0 text-[10px] text-background">
+                      {activeFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-80 overflow-y-auto border-r border-border/30 bg-white p-6">
+                <SheetTitle className="sr-only">Product Filters</SheetTitle>
+                <FilterPanel
+                  products={baseProducts}
+                  filters={filters}
+                  onChange={setFilters}
+                />
+              </SheetContent>
+            </Sheet>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 rounded-full">
+                  Sort: {sortOptions.find((s) => s.id === selectedSort)?.label}
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="rounded-xl">
+                {sortOptions.map((option) => (
+                  <DropdownMenuItem
+                    key={option.id}
+                    onClick={() => setSelectedSort(option.id)}
+                    className={selectedSort === option.id ? "bg-accent" : ""}
+                  >
+                    {option.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {/* Result count + active info */}
+        <div className="mb-6 flex items-center gap-3">
+          <p className="text-sm text-muted-foreground">
+            {filteredProducts.length} {filteredProducts.length === 1 ? "product" : "products"}
+            {selectedCategory !== "all" && (
+              <> in <span className="font-medium text-foreground">{categories.find(c => c.slug === selectedCategory)?.name}</span></>
+            )}
+          </p>
+          {(activeFilterCount > 0 || selectedCategory !== "all" || searchQuery) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto rounded-full px-2 py-1 text-xs text-muted-foreground"
+              onClick={clearAll}
+            >
+              Clear all
             </Button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </div>
+
+        {/* Main content: Sidebar + Grid */}
+        <div className="flex gap-8">
+          {/* Desktop sidebar */}
+          <aside className="hidden w-60 shrink-0 lg:block">
+            <div className="sticky top-24">
+              <FilterPanel
+                products={baseProducts}
+                filters={filters}
+                onChange={setFilters}
+              />
+            </div>
+          </aside>
+
+          {/* Product Grid */}
+          <div className="min-w-0 flex-1">
+            <AnimatePresence mode="wait">
+              {filteredProducts.length > 0 ? (
+                <motion.div
+                  key={`${selectedCategory}-${selectedSort}-${searchQuery}-${JSON.stringify(filters)}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                  className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+                >
+                  {filteredProducts.map((product, index) => (
+                    <motion.div
+                      key={product.id}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        duration: 0.35,
+                        delay: Math.min(index * 0.03, 0.3),
+                        ease: [0.25, 0.1, 0.25, 1],
+                      }}
+                    >
+                      <ProductCard product={product} />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex flex-col items-center justify-center py-20"
+                >
+                  <SlidersHorizontal className="mb-4 h-12 w-12 text-muted-foreground/40" />
+                  <h3 className="text-lg font-medium">No products found</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Try adjusting your filters or search query
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-4 rounded-full"
+                    onClick={clearAll}
+                  >
+                    Clear Filters
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
     </div>
   );
