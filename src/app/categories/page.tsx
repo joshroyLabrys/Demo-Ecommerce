@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "motion/react";
 import { Search, SlidersHorizontal, ChevronDown } from "lucide-react";
@@ -17,6 +17,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { ProductCard } from "@/components/product-card";
 import {
   FilterPanel,
+  ActiveFilterBadges,
   emptyFilters,
   applyFilters,
   getActiveFilterCount,
@@ -38,6 +39,16 @@ export default function CategoriesPage() {
   const [selectedSort, setSelectedSort] = useState("featured");
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleFocusSearch = () => {
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener("focus-search", handleFocusSearch);
+    return () => window.removeEventListener("focus-search", handleFocusSearch);
+  }, []);
 
   const baseProducts = useMemo(() => {
     let result = [...products];
@@ -90,6 +101,20 @@ export default function CategoriesPage() {
 
   return (
     <div>
+      {/* Search focus overlay */}
+      <AnimatePresence>
+        {isSearchFocused && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-30 bg-black/40"
+            onClick={() => searchInputRef.current?.blur()}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Page Header */}
       <div className="border-b border-border/30 bg-gradient-to-b from-stone-100 to-background">
         <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -130,13 +155,16 @@ export default function CategoriesPage() {
         </div>
 
         {/* Toolbar: Search + Sort + Mobile Filter Toggle */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative max-w-sm flex-1">
+        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative z-40 max-w-sm flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
+              ref={searchInputRef}
               placeholder="Search products..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setIsSearchFocused(false)}
               className="rounded-full pl-10"
             />
           </div>
@@ -189,6 +217,26 @@ export default function CategoriesPage() {
             </DropdownMenu>
           </div>
         </div>
+
+        {/* Active filter badges */}
+        <AnimatePresence initial={false}>
+          {activeFilterCount > 0 && (
+            <motion.div
+              key="filter-badges"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+              className="overflow-hidden"
+            >
+              <ActiveFilterBadges
+                filters={filters}
+                onChange={setFilters}
+                className="mb-4"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Result count + active info */}
         <div className="mb-6 flex items-center gap-3">

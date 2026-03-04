@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ShoppingBag, User, Menu, Search, LogOut, Package, ChevronDown } from "lucide-react";
@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CartDrawer } from "@/components/cart-drawer";
 import { useCart } from "@/contexts/cart-context";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
@@ -28,9 +29,18 @@ const navigation = [
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const { itemCount } = useCart();
   const { user, isAuthenticated, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleSearchClick = () => {
+    if (pathname.startsWith("/categories")) {
+      window.dispatchEvent(new Event("focus-search"));
+    } else {
+      router.push("/categories");
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-white/85 backdrop-blur-xl supports-[backdrop-filter]:bg-white/70">
@@ -68,11 +78,14 @@ export function SiteHeader() {
 
         {/* Right Actions */}
         <div className="flex items-center gap-2">
-          <Link href="/categories">
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <Search className="h-5 w-5" />
-            </Button>
-          </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full"
+            onClick={handleSearchClick}
+          >
+            <Search className="h-5 w-5" />
+          </Button>
 
           {/* Account */}
           {isAuthenticated ? (
@@ -113,8 +126,8 @@ export function SiteHeader() {
             </Link>
           )}
 
-          {/* Cart */}
-          <Link href="/cart">
+          {/* Cart Drawer */}
+          <CartDrawer>
             <Button variant="ghost" size="icon" className="relative rounded-full">
               <ShoppingBag className="h-5 w-5" />
               <AnimatePresence>
@@ -132,7 +145,7 @@ export function SiteHeader() {
                 )}
               </AnimatePresence>
             </Button>
-          </Link>
+          </CartDrawer>
 
           {/* Mobile Menu */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>

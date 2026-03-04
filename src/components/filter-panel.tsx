@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { ChevronDown, Star, X } from "lucide-react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { ChevronDown, ChevronUp, Star, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -84,34 +85,243 @@ export function applyFilters(products: Product[], filters: Filters): Product[] {
   return result;
 }
 
-function CollapsibleSection({
-  title,
-  defaultOpen = true,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
+/* ------------------------------------------------------------------ */
+/*  ActiveFilterBadges – rendered in the toolbar, not the sidebar     */
+/* ------------------------------------------------------------------ */
+
+interface ActiveFilterBadgesProps {
+  filters: Filters;
+  onChange: (filters: Filters) => void;
+  className?: string;
+}
+
+export function ActiveFilterBadges({
+  filters,
+  onChange,
+  className,
+}: ActiveFilterBadgesProps) {
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const activeCount = getActiveFilterCount(filters);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const firstChild = el.firstElementChild as HTMLElement | null;
+    if (!firstChild) {
+      setOverflows(false);
+      return;
+    }
+    const rowHeight = firstChild.offsetHeight + 8;
+    setOverflows(el.scrollHeight > rowHeight);
+  }, [activeCount]);
+
+  useEffect(() => {
+    if (!overflows) setExpanded(false);
+  }, [overflows]);
+
+  if (activeCount === 0) return null;
+
+  const removeBrand = (b: string) =>
+    onChange({ ...filters, brands: filters.brands.filter((x) => x !== b) });
+  const removePriceRange = (id: string) =>
+    onChange({
+      ...filters,
+      priceRanges: filters.priceRanges.filter((x) => x !== id),
+    });
+  const removeColor = (c: string) =>
+    onChange({ ...filters, colors: filters.colors.filter((x) => x !== c) });
+  const removeSize = (s: string) =>
+    onChange({ ...filters, sizes: filters.sizes.filter((x) => x !== s) });
+
   return (
-    <div className="border-b border-border/40 py-4">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between text-sm font-semibold text-foreground"
+    <div className={cn("flex items-start gap-2", className)}>
+      <motion.div
+        initial={false}
+        animate={{ height: expanded || !overflows ? "auto" : 32 }}
+        transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+        className="flex-1 overflow-hidden"
       >
-        {title}
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 text-muted-foreground transition-transform duration-200",
-            open && "rotate-180"
+        <div ref={contentRef} className="flex flex-wrap gap-1.5">
+          {filters.brands.map((b) => (
+            <Badge
+              key={`b-${b}`}
+              variant="secondary"
+              className="gap-1 rounded-full text-[11px]"
+            >
+              {b}
+              <button onClick={() => removeBrand(b)}>
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+          {filters.priceRanges.map((id) => {
+            const r = PRICE_RANGES.find((pr) => pr.id === id);
+            return (
+              <Badge
+                key={`p-${id}`}
+                variant="secondary"
+                className="gap-1 rounded-full text-[11px]"
+              >
+                {r?.label}
+                <button onClick={() => removePriceRange(id)}>
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            );
+          })}
+          {filters.colors.map((c) => (
+            <Badge
+              key={`c-${c}`}
+              variant="secondary"
+              className="gap-1 rounded-full text-[11px]"
+            >
+              {c}
+              <button onClick={() => removeColor(c)}>
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+          {filters.sizes.map((s) => (
+            <Badge
+              key={`s-${s}`}
+              variant="secondary"
+              className="gap-1 rounded-full text-[11px]"
+            >
+              {s}
+              <button onClick={() => removeSize(s)}>
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+          {filters.minRating > 0 && (
+            <Badge
+              variant="secondary"
+              className="gap-1 rounded-full text-[11px]"
+            >
+              {filters.minRating}+ stars
+              <button onClick={() => onChange({ ...filters, minRating: 0 })}>
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
           )}
-        />
-      </button>
-      {open && <div className="mt-3 space-y-2">{children}</div>}
+          {filters.onSale && (
+            <Badge
+              variant="secondary"
+              className="gap-1 rounded-full text-[11px]"
+            >
+              On Sale
+              <button onClick={() => onChange({ ...filters, onSale: false })}>
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto rounded-full px-2 py-0.5 text-[11px] text-muted-foreground"
+            onClick={() => onChange(emptyFilters)}
+          >
+            Clear all
+          </Button>
+        </div>
+      </motion.div>
+      {overflows && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 shrink-0 px-2 text-xs text-muted-foreground"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? (
+            <>
+              Less <ChevronUp className="ml-0.5 h-3 w-3" />
+            </>
+          ) : (
+            <>
+              More <ChevronDown className="ml-0.5 h-3 w-3" />
+            </>
+          )}
+        </Button>
+      )}
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  FilterSection – controlled collapsible with smart accordion       */
+/* ------------------------------------------------------------------ */
+
+function FilterSection({
+  title,
+  sectionKey,
+  expandedSection,
+  onToggle,
+  hasActiveFilters,
+  activeCount,
+  children,
+  activeChildren,
+}: {
+  title: string;
+  sectionKey: string;
+  expandedSection: string | null;
+  onToggle: (key: string) => void;
+  hasActiveFilters: boolean;
+  activeCount?: number;
+  children: React.ReactNode;
+  activeChildren?: React.ReactNode;
+}) {
+  const isExpanded = expandedSection === sectionKey;
+  const showContent = isExpanded || hasActiveFilters;
+
+  return (
+    <div className="border-b border-border/40 py-4">
+      <button
+        onClick={() => onToggle(sectionKey)}
+        className="flex w-full items-center justify-between text-sm font-semibold text-foreground"
+      >
+        <span className="flex items-center gap-2">
+          {title}
+          {hasActiveFilters &&
+            !isExpanded &&
+            activeCount != null &&
+            activeCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-bold text-background">
+                {activeCount}
+              </span>
+            )}
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 text-muted-foreground transition-transform duration-200",
+            isExpanded && "rotate-180"
+          )}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {showContent && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="mt-3 space-y-2">
+              {isExpanded ? children : activeChildren}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  FilterPanel                                                        */
+/* ------------------------------------------------------------------ */
 
 interface FilterPanelProps {
   products: Product[];
@@ -126,6 +336,8 @@ export function FilterPanel({
   onChange,
   className,
 }: FilterPanelProps) {
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+
   const availableOptions = useMemo(() => {
     const brands = new Map<string, number>();
     const colors = new Map<string, { name: string; value: string }>();
@@ -212,9 +424,12 @@ export function FilterPanel({
 
   const activeCount = getActiveFilterCount(filters);
 
+  const handleToggle = (key: string) => {
+    setExpandedSection((prev) => (prev === key ? null : key));
+  };
+
   return (
     <div className={cn("flex flex-col", className)}>
-      {/* Header */}
       <div className="flex items-center justify-between pb-2">
         <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
           Filters
@@ -231,88 +446,24 @@ export function FilterPanel({
         )}
       </div>
 
-      {/* Active filter chips */}
-      {activeCount > 0 && (
-        <div className="flex flex-wrap gap-1.5 border-b border-border/40 pb-4">
-          {filters.brands.map((b) => (
-            <Badge
-              key={b}
-              variant="secondary"
-              className="gap-1 rounded-full text-[11px]"
-            >
-              {b}
-              <button onClick={() => toggleBrand(b)}>
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
-          {filters.priceRanges.map((id) => {
-            const r = PRICE_RANGES.find((pr) => pr.id === id);
-            return (
-              <Badge
-                key={id}
-                variant="secondary"
-                className="gap-1 rounded-full text-[11px]"
-              >
-                {r?.label}
-                <button onClick={() => togglePriceRange(id)}>
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            );
-          })}
-          {filters.colors.map((c) => (
-            <Badge
-              key={c}
-              variant="secondary"
-              className="gap-1 rounded-full text-[11px]"
-            >
-              {c}
-              <button onClick={() => toggleColor(c)}>
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
-          {filters.sizes.map((s) => (
-            <Badge
-              key={s}
-              variant="secondary"
-              className="gap-1 rounded-full text-[11px]"
-            >
-              {s}
-              <button onClick={() => toggleSize(s)}>
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
-          {filters.minRating > 0 && (
-            <Badge
-              variant="secondary"
-              className="gap-1 rounded-full text-[11px]"
-            >
-              {filters.minRating}+ stars
-              <button onClick={() => setRating(0)}>
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          )}
-          {filters.onSale && (
-            <Badge
-              variant="secondary"
-              className="gap-1 rounded-full text-[11px]"
-            >
-              On Sale
-              <button onClick={() => onChange({ ...filters, onSale: false })}>
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          )}
-        </div>
-      )}
-
-      {/* Brand */}
       {availableOptions.brands.length > 1 && (
-        <CollapsibleSection title="Brand">
+        <FilterSection
+          title="Brand"
+          sectionKey="brand"
+          expandedSection={expandedSection}
+          onToggle={handleToggle}
+          hasActiveFilters={filters.brands.length > 0}
+          activeCount={filters.brands.length}
+          activeChildren={filters.brands.map((brand) => (
+            <label
+              key={brand}
+              className="flex cursor-pointer items-center gap-2.5"
+            >
+              <Checkbox checked onCheckedChange={() => toggleBrand(brand)} />
+              <span className="flex-1 text-sm text-foreground/80">{brand}</span>
+            </label>
+          ))}
+        >
           {availableOptions.brands.map(([brand, count]) => (
             <label
               key={brand}
@@ -322,17 +473,35 @@ export function FilterPanel({
                 checked={filters.brands.includes(brand)}
                 onCheckedChange={() => toggleBrand(brand)}
               />
-              <span className="flex-1 text-sm text-foreground/80">
-                {brand}
-              </span>
+              <span className="flex-1 text-sm text-foreground/80">{brand}</span>
               <span className="text-xs text-muted-foreground">{count}</span>
             </label>
           ))}
-        </CollapsibleSection>
+        </FilterSection>
       )}
 
-      {/* Price Range */}
-      <CollapsibleSection title="Price">
+      <FilterSection
+        title="Price"
+        sectionKey="price"
+        expandedSection={expandedSection}
+        onToggle={handleToggle}
+        hasActiveFilters={filters.priceRanges.length > 0}
+        activeCount={filters.priceRanges.length}
+        activeChildren={filters.priceRanges.map((id) => {
+          const range = PRICE_RANGES.find((r) => r.id === id);
+          return (
+            <label
+              key={id}
+              className="flex cursor-pointer items-center gap-2.5"
+            >
+              <Checkbox checked onCheckedChange={() => togglePriceRange(id)} />
+              <span className="flex-1 text-sm text-foreground/80">
+                {range?.label}
+              </span>
+            </label>
+          );
+        })}
+      >
         {PRICE_RANGES.map((range) => {
           const count = availableOptions.priceRangeCounts.get(range.id) || 0;
           if (count === 0) return null;
@@ -352,11 +521,41 @@ export function FilterPanel({
             </label>
           );
         })}
-      </CollapsibleSection>
+      </FilterSection>
 
-      {/* Color */}
       {availableOptions.colors.length > 0 && (
-        <CollapsibleSection title="Color">
+        <FilterSection
+          title="Color"
+          sectionKey="color"
+          expandedSection={expandedSection}
+          onToggle={handleToggle}
+          hasActiveFilters={filters.colors.length > 0}
+          activeCount={filters.colors.length}
+          activeChildren={
+            <div className="flex flex-wrap gap-2">
+              {availableOptions.colors
+                .filter((c) => filters.colors.includes(c.name))
+                .map((color) => (
+                  <button
+                    key={color.name}
+                    onClick={() => toggleColor(color.name)}
+                    className="group flex flex-col items-center gap-1"
+                    title={color.name}
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-foreground shadow-sm">
+                      <span
+                        className="h-5 w-5 rounded-full border border-black/10"
+                        style={{ backgroundColor: color.value }}
+                      />
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {color.name}
+                    </span>
+                  </button>
+                ))}
+            </div>
+          }
+        >
           <div className="flex flex-wrap gap-2">
             {availableOptions.colors.map((color) => {
               const selected = filters.colors.includes(color.name);
@@ -387,12 +586,31 @@ export function FilterPanel({
               );
             })}
           </div>
-        </CollapsibleSection>
+        </FilterSection>
       )}
 
-      {/* Size */}
       {availableOptions.sizes.length > 0 && (
-        <CollapsibleSection title="Size">
+        <FilterSection
+          title="Size"
+          sectionKey="size"
+          expandedSection={expandedSection}
+          onToggle={handleToggle}
+          hasActiveFilters={filters.sizes.length > 0}
+          activeCount={filters.sizes.length}
+          activeChildren={
+            <div className="flex flex-wrap gap-1.5">
+              {filters.sizes.map((size) => (
+                <button
+                  key={size}
+                  onClick={() => toggleSize(size)}
+                  className="rounded-lg border border-foreground bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-all"
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          }
+        >
           <div className="flex flex-wrap gap-1.5">
             {availableOptions.sizes.map((size) => {
               const selected = filters.sizes.includes(size);
@@ -412,11 +630,42 @@ export function FilterPanel({
               );
             })}
           </div>
-        </CollapsibleSection>
+        </FilterSection>
       )}
 
-      {/* Rating */}
-      <CollapsibleSection title="Rating" defaultOpen={false}>
+      <FilterSection
+        title="Rating"
+        sectionKey="rating"
+        expandedSection={expandedSection}
+        onToggle={handleToggle}
+        hasActiveFilters={filters.minRating > 0}
+        activeCount={filters.minRating > 0 ? 1 : 0}
+        activeChildren={
+          filters.minRating > 0 ? (
+            <div className="space-y-1.5">
+              <button
+                onClick={() => setRating(filters.minRating)}
+                className="flex w-full items-center gap-2 rounded-lg bg-amber-50 px-2 py-1.5 text-sm text-foreground"
+              >
+                <div className="flex items-center gap-0.5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star
+                      key={i}
+                      className={cn(
+                        "h-3.5 w-3.5",
+                        i < filters.minRating
+                          ? "fill-amber-400 text-amber-400"
+                          : "fill-neutral-200 text-neutral-200"
+                      )}
+                    />
+                  ))}
+                </div>
+                <span>& up</span>
+              </button>
+            </div>
+          ) : undefined
+        }
+      >
         <div className="space-y-1.5">
           {[4, 3, 2].map((rating) => (
             <button
@@ -446,9 +695,8 @@ export function FilterPanel({
             </button>
           ))}
         </div>
-      </CollapsibleSection>
+      </FilterSection>
 
-      {/* On Sale */}
       {availableOptions.onSaleCount > 0 && (
         <div className="py-4">
           <label className="flex cursor-pointer items-center gap-2.5">

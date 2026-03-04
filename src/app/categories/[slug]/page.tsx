@@ -2,7 +2,7 @@
 
 import { use, useState, useMemo } from "react";
 import Link from "next/link";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { ChevronRight, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { ProductCard } from "@/components/product-card";
 import {
   FilterPanel,
+  ActiveFilterBadges,
   emptyFilters,
   applyFilters,
   getActiveFilterCount,
@@ -88,7 +89,7 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Toolbar */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <p className="text-sm text-muted-foreground">
               {sortedProducts.length} {sortedProducts.length === 1 ? "product" : "products"}
@@ -153,6 +154,26 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
             </DropdownMenu>
           </div>
         </div>
+
+        {/* Active filter badges */}
+        <AnimatePresence initial={false}>
+          {activeFilterCount > 0 && (
+            <motion.div
+              key="filter-badges"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+              className="overflow-hidden"
+            >
+              <ActiveFilterBadges
+                filters={filters}
+                onChange={setFilters}
+                className="mb-4"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Main content: Sidebar + Grid */}
         <div className="flex gap-8">
