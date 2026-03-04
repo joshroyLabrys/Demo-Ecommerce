@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, Star, Minus, Plus, ShoppingCart } from "lucide-react";
+import { Heart, Star, Minus, Plus, ShoppingCart, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/cart-context";
 import { toast } from "sonner";
@@ -27,9 +28,11 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, className }: ProductCardProps) {
+  const router = useRouter();
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
     setIsWishlisted(getWishlist().includes(product.id));
@@ -58,9 +61,18 @@ export function ProductCard({ product, className }: ProductCardProps) {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem(product, quantity);
-    toast.success(`${product.name} added to cart`);
-    setQuantity(1);
+    setIsAdding(true);
+    setTimeout(() => {
+      addItem(product, quantity);
+      setIsAdding(false);
+      toast.success(`${product.name} added to cart`, {
+        action: {
+          label: "View Cart",
+          onClick: () => router.push("/cart"),
+        },
+      });
+      setQuantity(1);
+    }, 350);
   };
 
   const handleQuantityChange = (e: React.MouseEvent, delta: number) => {
@@ -187,10 +199,17 @@ export function ProductCard({ product, className }: ProductCardProps) {
             <Button
               size="sm"
               onClick={handleAddToCart}
+              disabled={isAdding}
               className="h-8 flex-1 gap-1.5 rounded-full text-xs font-semibold"
             >
-              <ShoppingCart className="h-3.5 w-3.5" />
-              Add to Cart
+              {isAdding ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <>
+                  <ShoppingCart className="h-3.5 w-3.5" />
+                  Add to Cart
+                </>
+              )}
             </Button>
           </div>
         </div>

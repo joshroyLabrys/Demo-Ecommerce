@@ -1,9 +1,10 @@
 "use client";
 
-import { use, useState, useMemo, FormEvent } from "react";
+import { use, useState, useMemo, FormEvent, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "motion/react";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "motion/react";
 import {
   ChevronRight,
   ChevronLeft,
@@ -19,6 +20,7 @@ import {
   RotateCcw,
   X,
   ZoomIn,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// Tabs UI is handled with custom animated buttons + AnimatePresence
 import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
@@ -69,6 +71,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
     (p) => p.id !== product.id
   );
 
+  const router = useRouter();
   const { addItem } = useCart();
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedSize, setSelectedSize] = useState<string | undefined>(
@@ -83,6 +86,8 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
   const [reviewHover, setReviewHover] = useState(0);
   const [ratingFilter, setRatingFilter] = useState<string>("all");
   const [reviewSort, setReviewSort] = useState<string>("newest");
+  const [activeTab, setActiveTab] = useState("reviews");
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const discount =
     product.originalPrice > product.price
@@ -91,10 +96,19 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
         )
       : 0;
 
-  const handleAddToCart = () => {
-    addItem(product, quantity, selectedSize, selectedColor?.name);
-    toast.success(`${product.name} added to cart`);
-  };
+  const handleAddToCart = useCallback(() => {
+    setIsAddingToCart(true);
+    setTimeout(() => {
+      addItem(product, quantity, selectedSize, selectedColor?.name);
+      setIsAddingToCart(false);
+      toast.success(`${product.name} added to cart`, {
+        action: {
+          label: "Go to Checkout",
+          onClick: () => router.push("/checkout"),
+        },
+      });
+    }, 400);
+  }, [product, quantity, selectedSize, selectedColor, addItem, router]);
 
   const openLightbox = (index: number) => {
     setLightboxIndex(index);
@@ -337,9 +351,19 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
               size="lg"
               className="flex-1 gap-2 rounded-full"
               onClick={handleAddToCart}
+              disabled={isAddingToCart}
             >
-              <ShoppingBag className="h-4 w-4" />
-              Add to Cart
+              {isAddingToCart ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <ShoppingBag className="h-4 w-4" />
+                  Add to Cart
+                </>
+              )}
             </Button>
             <Button
               size="lg"
@@ -381,98 +405,138 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
 
       {/* Product Tabs: Description / Specifications / Reviews */}
       <AnimatedSection className="mt-20">
-        <Tabs defaultValue="reviews" className="w-full">
-          <TabsList className="mb-8 w-full justify-start rounded-full border bg-transparent p-1">
-            <TabsTrigger value="description" className="rounded-full px-6 data-[state=active]:bg-foreground data-[state=active]:text-background">
-              Description
-            </TabsTrigger>
-            <TabsTrigger value="specifications" className="rounded-full px-6 data-[state=active]:bg-foreground data-[state=active]:text-background">
-              Specifications
-            </TabsTrigger>
-            <TabsTrigger value="reviews" className="rounded-full px-6 data-[state=active]:bg-foreground data-[state=active]:text-background">
-              Reviews ({displayReviews.length})
-            </TabsTrigger>
-          </TabsList>
+        <div className="w-full">
+          <div className="mb-8 flex w-full justify-start rounded-full border bg-transparent p-1">
+            {[
+              { value: "description", label: "Description" },
+              { value: "specifications", label: "Specifications" },
+              { value: "reviews", label: `Reviews (${displayReviews.length})` },
+            ].map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setActiveTab(tab.value)}
+                className={cn(
+                  "relative rounded-full px-6 py-1.5 text-sm font-medium transition-colors",
+                  activeTab === tab.value
+                    ? "text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {activeTab === tab.value && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute inset-0 rounded-full bg-foreground"
+                    transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                  />
+                )}
+                <span className="relative z-10">{tab.label}</span>
+              </button>
+            ))}
+          </div>
 
-          {/* Description Tab */}
-          <TabsContent value="description">
-            <Card className="rounded-2xl border-white/20 bg-white/60 backdrop-blur-sm">
-              <CardContent className="p-6 sm:p-8">
-                <h3 className="mb-4 text-lg font-semibold">About this product</h3>
-                <p className="leading-relaxed text-muted-foreground">
-                  {product.longDescription}
-                </p>
-                <Separator className="my-6" />
-                <h4 className="mb-3 text-sm font-semibold">Highlights</h4>
-                <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-                  <li className="flex items-center gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-foreground" />
-                    Premium quality materials
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-foreground" />
-                    Designed for everyday use
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-foreground" />
-                    Backed by 2-year warranty
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-foreground" />
-                    Eco-friendly packaging
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          <AnimatePresence mode="wait">
+            {/* Description Tab */}
+            {activeTab === "description" && (
+              <motion.div
+                key="description"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+              >
+                <Card className="rounded-2xl border-white/20 bg-white/60 backdrop-blur-sm">
+                  <CardContent className="p-6 sm:p-8">
+                    <h3 className="mb-4 text-lg font-semibold">About this product</h3>
+                    <p className="leading-relaxed text-muted-foreground">
+                      {product.longDescription}
+                    </p>
+                    <Separator className="my-6" />
+                    <h4 className="mb-3 text-sm font-semibold">Highlights</h4>
+                    <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                      <li className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-foreground" />
+                        Premium quality materials
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-foreground" />
+                        Designed for everyday use
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-foreground" />
+                        Backed by 2-year warranty
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-foreground" />
+                        Eco-friendly packaging
+                      </li>
+                    </ul>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
 
-          {/* Specifications Tab */}
-          <TabsContent value="specifications">
-            <Card className="rounded-2xl border-white/20 bg-white/60 backdrop-blur-sm">
-              <CardContent className="p-6 sm:p-8">
-                <h3 className="mb-4 text-lg font-semibold">Product Specifications</h3>
-                <div className="divide-y">
-                  <div className="flex justify-between py-3 text-sm">
-                    <span className="text-muted-foreground">Brand</span>
-                    <span className="font-medium">{product.brand}</span>
-                  </div>
-                  <div className="flex justify-between py-3 text-sm">
-                    <span className="text-muted-foreground">Category</span>
-                    <span className="font-medium">{product.category}</span>
-                  </div>
-                  {product.sizes && (
-                    <div className="flex justify-between py-3 text-sm">
-                      <span className="text-muted-foreground">Available Sizes</span>
-                      <span className="font-medium">{product.sizes.join(", ")}</span>
+            {/* Specifications Tab */}
+            {activeTab === "specifications" && (
+              <motion.div
+                key="specifications"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+              >
+                <Card className="rounded-2xl border-white/20 bg-white/60 backdrop-blur-sm">
+                  <CardContent className="p-6 sm:p-8">
+                    <h3 className="mb-4 text-lg font-semibold">Product Specifications</h3>
+                    <div className="divide-y">
+                      <div className="flex justify-between py-3 text-sm">
+                        <span className="text-muted-foreground">Brand</span>
+                        <span className="font-medium">{product.brand}</span>
+                      </div>
+                      <div className="flex justify-between py-3 text-sm">
+                        <span className="text-muted-foreground">Category</span>
+                        <span className="font-medium">{product.category}</span>
+                      </div>
+                      {product.sizes && (
+                        <div className="flex justify-between py-3 text-sm">
+                          <span className="text-muted-foreground">Available Sizes</span>
+                          <span className="font-medium">{product.sizes.join(", ")}</span>
+                        </div>
+                      )}
+                      {product.colors && (
+                        <div className="flex justify-between py-3 text-sm">
+                          <span className="text-muted-foreground">Available Colors</span>
+                          <span className="font-medium">{product.colors.map((c) => c.name).join(", ")}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between py-3 text-sm">
+                        <span className="text-muted-foreground">SKU</span>
+                        <span className="font-medium">{product.id.toUpperCase()}</span>
+                      </div>
+                      <div className="flex justify-between py-3 text-sm">
+                        <span className="text-muted-foreground">Availability</span>
+                        <Badge variant="secondary" className={cn("rounded-full", product.inStock ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800")}>
+                          {product.inStock ? "In Stock" : "Out of Stock"}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between py-3 text-sm">
+                        <span className="text-muted-foreground">Rating</span>
+                        <span className="font-medium">{product.rating} / 5 ({product.reviewCount} reviews)</span>
+                      </div>
                     </div>
-                  )}
-                  {product.colors && (
-                    <div className="flex justify-between py-3 text-sm">
-                      <span className="text-muted-foreground">Available Colors</span>
-                      <span className="font-medium">{product.colors.map((c) => c.name).join(", ")}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between py-3 text-sm">
-                    <span className="text-muted-foreground">SKU</span>
-                    <span className="font-medium">{product.id.toUpperCase()}</span>
-                  </div>
-                  <div className="flex justify-between py-3 text-sm">
-                    <span className="text-muted-foreground">Availability</span>
-                    <Badge variant="secondary" className={cn("rounded-full", product.inStock ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800")}>
-                      {product.inStock ? "In Stock" : "Out of Stock"}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between py-3 text-sm">
-                    <span className="text-muted-foreground">Rating</span>
-                    <span className="font-medium">{product.rating} / 5 ({product.reviewCount} reviews)</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
 
-          {/* Reviews Tab */}
-          <TabsContent value="reviews">
+            {/* Reviews Tab */}
+            {activeTab === "reviews" && (
+              <motion.div
+                key="reviews"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+              >
             <div className="grid gap-8 lg:grid-cols-3">
               <div className="lg:col-span-2 space-y-6">
                 {/* Rating Distribution */}
@@ -623,7 +687,9 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                         toast.error("Please select a rating");
                         return;
                       }
-                      toast.success("Thank you! Your review has been submitted.");
+                      toast.success("Thank you! Your review has been submitted.", {
+                        description: "It will appear after moderation.",
+                      });
                       setReviewRating(0);
                     }}
                     className="space-y-4"
@@ -676,8 +742,10 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-        </Tabs>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </AnimatedSection>
 
       {/* Fullscreen Image Lightbox */}
