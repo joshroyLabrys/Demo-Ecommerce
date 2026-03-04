@@ -16,6 +16,7 @@ import {
   EyeOff,
   Package,
   ClipboardCheck,
+  Loader2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,12 +52,13 @@ const SHIPPING_METHODS = [
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, subtotal, shipping, tax, total, clearCart, promoCode, promoDiscount, promoLabel, shippingMethod, setShippingMethod } = useCart();
+  const { items, subtotal, shipping, tax, total, clearCart, promoDiscount, promoLabel, shippingMethod, setShippingMethod } = useCart();
   const { placeOrder } = useOrders();
   const { user } = useAuth();
 
   const [step, setStep] = useState(1);
   const [showCvv, setShowCvv] = useState(false);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [formData, setFormData] = useState({
     email: user?.email || "",
     firstName: user?.firstName || "",
@@ -95,22 +97,31 @@ export default function CheckoutPage() {
   const prevStep = () => { directionRef.current = -1; setStep((prev) => Math.max(prev - 1, 1)); };
 
   const handlePlaceOrder = () => {
-    const order = placeOrder(
-      items,
-      { subtotal, shipping, tax, total },
-      {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        zipCode: formData.zipCode,
-        country: formData.country,
-      }
-    );
-    clearCart();
-    toast.success("Order placed successfully!");
-    router.push(`/account/orders?placed=${order.orderNumber}`);
+    setIsPlacingOrder(true);
+    setTimeout(() => {
+      const order = placeOrder(
+        items,
+        { subtotal, shipping, tax, total },
+        {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+          country: formData.country,
+        }
+      );
+      clearCart();
+      toast.success("Order placed successfully!", {
+        description: `Order ${order.orderNumber} is being processed.`,
+        action: {
+          label: "View Order",
+          onClick: () => router.push(`/account/orders/${order.id}`),
+        },
+      });
+      router.push(`/account/orders?placed=${order.orderNumber}`);
+    }, 800);
   };
 
   if (items.length === 0) {
@@ -173,16 +184,28 @@ export default function CheckoutPage() {
       <div className="grid gap-8 lg:grid-cols-5">
         {/* Form */}
         <div className="lg:col-span-3">
-          <Card className="rounded-2xl border-white/20 bg-white/60 backdrop-blur-sm">
-            <CardHeader>
+          <Card className="flex flex-col rounded-2xl border-white/20 bg-white/60 backdrop-blur-sm">
+            <CardHeader className="shrink-0">
               <CardTitle>
-                {step === 1 && "Contact Information"}
-                {step === 2 && "Shipping Details"}
-                {step === 3 && "Payment Details"}
-                {step === 4 && "Review Your Order"}
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={step}
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    transition={{ duration: 0.15 }}
+                    className="block"
+                  >
+                    {step === 1 && "Contact Information"}
+                    {step === 2 && "Shipping Details"}
+                    {step === 3 && "Payment Details"}
+                    {step === 4 && "Review Your Order"}
+                  </motion.span>
+                </AnimatePresence>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="flex flex-1 flex-col space-y-0">
+              <div className="min-h-[420px] overflow-y-auto pr-1">
               <AnimatePresence mode="wait" initial={false}>
                 {/* Step 1 */}
                 {step === 1 && (
@@ -518,9 +541,10 @@ export default function CheckoutPage() {
                   </motion.div>
                 )}
               </AnimatePresence>
+              </div>
 
-              {/* Navigation */}
-              <div className="flex items-center justify-between pt-4">
+              {/* Navigation — pinned at bottom so buttons never move */}
+              <div className="shrink-0 border-t pt-4 mt-4 flex items-center justify-between">
                 <Button
                   variant="ghost"
                   className="gap-1.5 rounded-full"
@@ -533,8 +557,16 @@ export default function CheckoutPage() {
                     Continue
                   </Button>
                 ) : (
-                  <Button className="gap-2 rounded-full px-8" onClick={handlePlaceOrder}>
-                    <Lock className="h-4 w-4" /> Place Order
+                  <Button className="gap-2 rounded-full px-8" onClick={handlePlaceOrder} disabled={isPlacingOrder}>
+                    {isPlacingOrder ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="h-4 w-4" /> Place Order
+                      </>
+                    )}
                   </Button>
                 )}
               </div>

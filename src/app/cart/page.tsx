@@ -193,59 +193,100 @@ export default function CartPage() {
             <CardContent className="space-y-4">
               {/* Promo Code */}
               <div>
-                {promoCode ? (
-                  <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3">
-                    <div className="flex items-center gap-2">
-                      <Tag className="h-4 w-4 text-green-600" />
-                      <div>
-                        <p className="text-sm font-medium text-green-800">{promoCode}</p>
-                        <p className="text-xs text-green-600">{promoLabel}</p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-green-600 hover:text-red-500"
-                      onClick={removePromoCode}
+                <AnimatePresence mode="wait">
+                  {promoCode ? (
+                    <motion.div
+                      key="promo-applied"
+                      initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                      transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                      className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3"
                     >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Promo code"
-                      value={promoInput}
-                      onChange={(e) => setPromoInput(e.target.value)}
-                      className="rounded-lg text-sm"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
+                      <div className="flex items-center gap-2">
+                        <motion.div
+                          initial={{ rotate: -90, scale: 0 }}
+                          animate={{ rotate: 0, scale: 1 }}
+                          transition={{ delay: 0.1, type: "spring", bounce: 0.4 }}
+                        >
+                          <Tag className="h-4 w-4 text-green-600" />
+                        </motion.div>
+                        <div>
+                          <p className="text-sm font-medium text-green-800">{promoCode}</p>
+                          <p className="text-xs text-green-600">{promoLabel}</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-green-600 hover:text-red-500"
+                        onClick={() => {
+                          removePromoCode();
+                          toast.success("Promo code removed");
+                        }}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="promo-input"
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 4 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex gap-2"
+                    >
+                      <Input
+                        placeholder="Promo code"
+                        value={promoInput}
+                        onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                        className="rounded-lg text-sm"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (applyPromoCode(promoInput)) {
+                              toast.success("Promo code applied!", {
+                                description: "Your discount has been added to the order.",
+                                action: {
+                                  label: "Checkout",
+                                  onClick: () => window.location.assign("/checkout"),
+                                },
+                              });
+                              setPromoInput("");
+                            } else {
+                              toast.error("Invalid promo code", {
+                                description: "Try SAVE10, WELCOME20, or FREESHIP.",
+                              });
+                            }
+                          }
+                        }}
+                      />
+                      <Button
+                        variant="outline"
+                        className="shrink-0 rounded-lg"
+                        onClick={() => {
                           if (applyPromoCode(promoInput)) {
-                            toast.success("Promo code applied!");
+                            toast.success("Promo code applied!", {
+                              description: "Your discount has been added to the order.",
+                              action: {
+                                label: "Checkout",
+                                onClick: () => window.location.assign("/checkout"),
+                              },
+                            });
                             setPromoInput("");
                           } else {
-                            toast.error("Invalid promo code");
+                            toast.error("Invalid promo code", {
+                              description: "Try SAVE10, WELCOME20, or FREESHIP.",
+                            });
                           }
-                        }
-                      }}
-                    />
-                    <Button
-                      variant="outline"
-                      className="shrink-0 rounded-lg"
-                      onClick={() => {
-                        if (applyPromoCode(promoInput)) {
-                          toast.success("Promo code applied!");
-                          setPromoInput("");
-                        } else {
-                          toast.error("Invalid promo code");
-                        }
-                      }}
-                    >
-                      Apply
-                    </Button>
-                  </div>
-                )}
+                        }}
+                      >
+                        Apply
+                      </Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               <Separator />
@@ -254,12 +295,20 @@ export default function CartPage() {
                 <span className="text-muted-foreground">Subtotal</span>
                 <span className="font-medium">${subtotal.toFixed(2)}</span>
               </div>
-              {promoDiscount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-green-600">Discount ({promoLabel})</span>
-                  <span className="font-medium text-green-600">-${promoDiscount.toFixed(2)}</span>
-                </div>
-              )}
+              <AnimatePresence>
+                {promoDiscount > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="flex justify-between text-sm overflow-hidden"
+                  >
+                    <span className="text-green-600">Discount ({promoLabel})</span>
+                    <span className="font-medium text-green-600">-${promoDiscount.toFixed(2)}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Shipping</span>
                 <span className="font-medium">
@@ -288,21 +337,25 @@ export default function CartPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-white/20 bg-white/60 backdrop-blur-sm">
+          <Card className="rounded-2xl border border-emerald-200/60 bg-emerald-50/50 backdrop-blur-sm">
             <CardContent className="p-4">
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <Package className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
+                    <Package className="h-4 w-4 text-emerald-600" />
+                  </div>
                   <div>
-                    <p className="text-sm font-medium">Free Shipping</p>
-                    <p className="text-xs text-muted-foreground">On orders over $200</p>
+                    <p className="text-sm font-medium text-emerald-900">Free Shipping</p>
+                    <p className="text-xs text-emerald-600">On orders over $200</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <CreditCard className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
+                    <CreditCard className="h-4 w-4 text-emerald-600" />
+                  </div>
                   <div>
-                    <p className="text-sm font-medium">Secure Payment</p>
-                    <p className="text-xs text-muted-foreground">Your data is protected</p>
+                    <p className="text-sm font-medium text-emerald-900">Secure Payment</p>
+                    <p className="text-xs text-emerald-600">Your data is protected</p>
                   </div>
                 </div>
               </div>
@@ -310,7 +363,8 @@ export default function CartPage() {
           </Card>
 
           <Link href="/categories" className="block">
-            <Button variant="outline" className="w-full gap-2 rounded-full">
+            <Button variant="outline" className="w-full gap-2 rounded-full border-foreground/20 bg-foreground/5 font-semibold hover:bg-foreground hover:text-background transition-colors">
+              <ShoppingBag className="h-4 w-4" />
               Continue Shopping
             </Button>
           </Link>
